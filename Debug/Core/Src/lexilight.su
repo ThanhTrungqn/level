@@ -1,0 +1,15 @@
+lexilight.c:44:6:Lexi_Init_Data	4	static
+lexilight.c:59:6:Lexi_Task	64	static
+lexilight.c:111:6:Lexi_DO_LED_PWM	16	static
+lexilight.c:133:6:Lexi_DO_Standard_PWM	16	static
+lexilight.c:141:6:Lexi_DO_PWM_LUM_DRIVER	32	static
+lexilight.c:217:14:Lexi_Get_Duty	4	static
+lexilight.c:220:14:Lexi_Get_Freq	4	static
+lexilight.c:223:14:Lexi_Get_Luminosity	4	static
+lexilight.c:226:14:Lexi_Get_Led_State_ON	4	static
+lexilight.c:238:6:Lexi_Set_State_OFF	4	static
+lexilight.c:241:6:Lexi_Set_State_ON	4	static
+lexilight.c:244:6:Lexi_Set_State_STANDARD	4	static
+lexilight.c:247:6:Lexi_Set_Duty	16	static
+lexilight.c:251:6:Lexi_Set_Freq	16	static
+lexilight.c:255:6:Lexi_Set_Luminosity	16	static
