@@ -34,6 +34,7 @@ typedef enum
 	LIGHT_STATE_SERVICE,		//Ready for Service
 	LIGHT_STATE_ON,				//Turn On Light LexiLight
 	LIGHT_STATE_STANDARD,		//Turn Light Normal
+	LIGHT_STATE_LEXI,			//Turn Light Lexi
 	LIGHT_STATE_OFF,			//Turn Off Light
 	LIGHT_STATE_ERROR			//Error
 
@@ -66,6 +67,7 @@ typedef struct {
 	unsigned int timer_on_off_start;
 	unsigned int timer_on_off_end;
 	unsigned int pwm_led_driver;
+	unsigned int lum_value;
 	LIGHT_STATES state;
 	LIGHT_LUM_LEVEL lum_level;
 } LEXILIGHT_DATA;
@@ -89,7 +91,8 @@ unsigned int Lexi_Get_Led_State_ON();
 void Lexi_Set_State_OFF ();
 void Lexi_Set_State_ON ();
 void Lexi_Set_State_STANDARD ();
-void Lexi_Set_Duty();
-void Lexi_Set_Freq();
+void Lexi_Set_Duty( unsigned int value );
+void Lexi_Set_State_LEXI ();
+void Lexi_Set_Freq( unsigned int value);
 void Lexi_Set_Luminosity( unsigned int value);
 #endif /* INC_LEXILIGHT_H_ */

@@ -1,4 +1,4 @@
 uart_task.c:47:6:UART_Init	8	static
-uart_task.c:52:6:UART_Task	8	static
-uart_task.c:102:6:UART_Reset_CMD	4	static
-uart_task.c:106:6:UART_Send_CMD	120	static
+uart_task.c:55:6:UART_Task	16	static
+uart_task.c:168:6:UART_Reset_CMD	4	static
+uart_task.c:172:6:UART_Send_CMD	120	static

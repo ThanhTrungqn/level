@@ -20,11 +20,13 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "app_touchgfx.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uart_task.h"
 #include "lexilight.h"
+#include "bq25713.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,6 +50,8 @@ DAC_HandleTypeDef hdac;
 
 DMA2D_HandleTypeDef hdma2d;
 
+I2C_HandleTypeDef hi2c1;
+
 LTDC_HandleTypeDef hltdc;
 
 SPI_HandleTypeDef hspi3;
@@ -69,7 +73,6 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DAC_Init(void);
 static void MX_LTDC_Init(void);
-static void MX_UART7_Init(void);
 static void MX_CRC_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_UART4_Init(void);
@@ -77,19 +80,107 @@ static void MX_TIM1_Init(void);
 static void MX_DMA2D_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_I2C1_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_UART7_Init(void);
 /* USER CODE BEGIN PFP */
 
+
+/* Chip Select macro definition */
+#define LCD_CS_LOW()       HAL_GPIO_WritePin(CS_LCD_GPIO_Port, CS_LCD_Pin, GPIO_PIN_RESET)
+#define LCD_CS_HIGH()      HAL_GPIO_WritePin(CS_LCD_GPIO_Port, CS_LCD_Pin, GPIO_PIN_SET)
+
+static void SPIx_Error(void)
+{
+  /* De-initialize the SPI communication BUS */
+  HAL_SPI_DeInit(&hspi3);
+
+  /* Re- Initialize the SPI communication BUS */
+   MX_SPI3_Init();
+}
+
+
+static void SPIx_Write(uint16_t Value)
+{
+  HAL_StatusTypeDef status = HAL_OK;
+
+  status = HAL_SPI_Transmit(&hspi3, (uint8_t*) &Value, 2, 0x1000);
+
+  /* Check the communication status */
+  if(status != HAL_OK)
+  {
+    /* Re-Initialize the BUS */
+    SPIx_Error();
+  }
+}
+
+__weak void LCD_IO_Init(void)
+{
+   /* Set or Reset the control line */
+    LCD_CS_LOW();
+    LCD_CS_HIGH();
+    MX_SPI3_Init();
+}
+
+__weak void     LCD_IO_WriteReg(uint8_t Reg){
+	uint16_t data_send = 0x0000 + Reg;
+	data_send <<= 7;
+	/* Reset LCD control line(/CS) and Send command */
+	LCD_CS_LOW();
+	SPIx_Write(data_send);
+
+	/* Deselect: Chip Select high */
+	LCD_CS_HIGH();
+}
+
+__weak void     LCD_IO_WriteData(uint16_t RegValue){
+	uint16_t data_send = 0x0100 + RegValue;
+	data_send <<= 7;
+	/* Reset LCD control line(/CS) and Send command */
+	LCD_CS_LOW();
+	SPIx_Write(data_send);
+
+	/* Deselect: Chip Select high */
+	LCD_CS_HIGH();
+}
+
+__weak void LCD_IO_Delay(uint32_t Delay)
+{
+  HAL_Delay(Delay);
+}
+
+
+/*
+__weak uint16_t LCD_IO_ReadData(void)
+{
+  uint32_t readvalue = 0;
+
+  LCD_CS_LOW();
+
+  LCD_WRX_LOW();
+
+  SPIx_Write(RegValue);
+
+  readvalue = SPIx_Read(ReadSize);
+
+  LCD_WRX_HIGH();
+
+  LCD_CS_HIGH();
+
+  return readvalue;
+}
+*/
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 //variables need to be declared at the beginning
+
 UART_DATA Uart_data;
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if (huart->Instance == UART5)  //current UART
+	if (huart->Instance == UART7)  //current UART
 	{
 		uint8_t i;
 		if (Uart_data.Rx_indx == 0)  //clear Rx_Buffer before receiving new data
@@ -113,6 +204,32 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		HAL_UART_Receive_IT(&huart7, Uart_data.Rx_data, 1);   //activate UART receive interrupt every time
 	}
 }
+
+void HAL_GPIO_EXTI_Callback (uint16_t GPIO_Pin){
+	//Check open Lampe
+	if ( GPIO_Pin == CMD_ON_OFF_Pin){
+		if(HAL_GPIO_ReadPin(CMD_ON_OFF_GPIO_Port, CMD_ON_OFF_Pin) == GPIO_PIN_RESET){
+			Lexi_Set_State_OFF();
+			//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+			//Turn off bluetooth
+			HAL_GPIO_WritePin(CMD_ALIM_BLE_GPIO_Port, CMD_ALIM_BLE_Pin , GPIO_PIN_SET);
+		}
+		else
+		{
+			Lexi_Set_State_ON();
+			HAL_GPIO_WritePin(CMD_ALIM_BLE_GPIO_Port, CMD_ALIM_BLE_Pin ,GPIO_PIN_RESET);
+			//Turn on bluetooth
+		}
+	}
+	//Check Charge Current
+	if ( GPIO_Pin == CHRG_OK_Pin){
+		if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_SET){
+			BQ25713_Default_Charge();
+		}
+	}
+}
+
+
 
 
 /* USER CODE END 0 */
@@ -148,7 +265,6 @@ int main(void)
   MX_GPIO_Init();
   MX_DAC_Init();
   MX_LTDC_Init();
-  MX_UART7_Init();
   MX_CRC_Init();
   MX_SPI3_Init();
   MX_UART4_Init();
@@ -156,27 +272,93 @@ int main(void)
   MX_DMA2D_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_I2C1_Init();
   MX_TIM4_Init();
+  MX_UART7_Init();
+  MX_TouchGFX_Init();
   /* USER CODE BEGIN 2 */
-
+  //HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13,GPIO_PIN_SET);
+  //HAL_Delay(1000);
 	Lexi_Init_Data();								//Init Data LexiLight
-	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);		//Start PWM TIM2 Channel 2 -- LED LAMPE
-	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);		//Start PWM TIM3 Channel 1 -- LED DRIVER
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);		//Start PWM TIM2 Channel 1 -- LED LAMPE
+	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);		//Start PWM TIM3 Channel 3 -- LED DRIVER
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);		//Start PWM TIM4 Channel 1 -- LED BACKLIGHT
 	HAL_TIM_Base_Start(&htim1);						//Start TIM1
 
 	__HAL_TIM_SET_COMPARE(&htim2 , TIM_CHANNEL_1,0);	//Set Duty = 0
-	__HAL_TIM_SET_COMPARE(&htim3 , TIM_CHANNEL_1,0);	//Set Duty = 0
-	__HAL_TIM_SET_COMPARE(&htim4 , TIM_CHANNEL_4,0);	//Set Duty = 0
+	__HAL_TIM_SET_COMPARE(&htim3 , TIM_CHANNEL_3,0);	//Set Duty = 0
+	__HAL_TIM_SET_COMPARE(&htim4 , TIM_CHANNEL_4,100);	//Set Duty = 0
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_1, GPIO_PIN_RESET);
 
+	HAL_UART_Receive_IT(&huart7, Uart_data.Rx_data, 1);
+	UART_Init();
+	BQ25713_Init( hi2c1);
+	ST7789H2_Init();
+
+
+	/*
+	if (HAL_I2C_IsDeviceReady(&hi2c1, 0x01AD, 10, 1000) == HAL_OK){
+		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_1, GPIO_PIN_RESET);
+	}
+	uint8_t data[40];
+
+	data[0] = 0x00;     // Pointer to address
+	data[1] = 0x00;  	// MSB byte of 16bit data
+	data[2] = 0x00;     // LSB byte of 16bit data
+	*/
+	//uint16_t regAddress = BQ25713_REG_CHARGE_OPTION_0;
+	//HAL_I2C_Master_Transmit(&hi2c1, BQ25713_I2C_ADDRESS << 1, data, 1, 1000);
+	//HAL_I2C_Mem_Read( &hi2c1, BQ25713_I2C_ADDRESS << 1, regAddress, 2, data, 2, 1000);
   /* USER CODE END 2 */
+ 
+ 
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	/*
+	data[0] = 0x00;
+	data[1] = 0xff >> 8;
+	data[2] = 0xff;
+	*/
+	uint8_t count =0;
   while (1)
   {
 	  Lexi_Task (htim2, htim3);
+	  count++;
+	  if (count > 15){
+		  BQ25713_Task();
+		  count = 0;
+	  }
+	  //HAL_Delay(100);
+	  //HAL_I2C_Master_Transmit(&hi2c1, 0xD6, data, 3, 1000);
+	  //HAL_I2C_Master_Receive( &hi2c1, 0xD6, data, 3, 1000);
+	  //HAL_GPIO_WritePin(GPIOD, GPIO_PIN_1, GPIO_PIN_RESET);
+
+	  /*
+	  HAL_I2C_Mem_Read(&hi2c1, 0xD6, 0x2E, 2, data, 2, 1000);
+	  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_1, GPIO_PIN_RESET);
+	  */
+	  /*
+	  	//HAL_I2C_Mem_Read( &hi2c1, BQ25713_I2C_ADDRESS << 1, regAddress, 2, data, 2, 1000);
+	  	HAL_StatusTypeDef hal_status = HAL_I2C_Mem_Read(&hi2c1, 0x01AC, 0x2E, 2, data, 2, 1000);
+	  	if (hal_status == HAL_OK)
+	  	{
+	  		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_1, GPIO_PIN_RESET);
+	  	}
+	  	//HAL_I2C_Master_Receive(&hi2c1, 0x01AC, data,2, 1000);
+	  	 * */
+/*
+	  HAL_Delay(2000);
+		uint8_t buffer[100];
+		uint8_t len;
+	  sprintf(buffer,"hello test uart\r\n");
+	  			len=strlen(buffer);
+	  			HAL_UART_Transmit(&huart7, buffer, len, 1000);
+	  			*/
+
     /* USER CODE END WHILE */
+
+  //MX_TouchGFX_Process();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -338,6 +520,52 @@ static void MX_DMA2D_Init(void)
 }
 
 /**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Analogue filter 
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Digital filter 
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
   * @brief LTDC Initialization Function
   * @param None
   * @retval None
@@ -350,7 +578,6 @@ static void MX_LTDC_Init(void)
   /* USER CODE END LTDC_Init 0 */
 
   LTDC_LayerCfgTypeDef pLayerCfg = {0};
-  LTDC_LayerCfgTypeDef pLayerCfg1 = {0};
 
   /* USER CODE BEGIN LTDC_Init 1 */
 
@@ -360,13 +587,13 @@ static void MX_LTDC_Init(void)
   hltdc.Init.VSPolarity = LTDC_VSPOLARITY_AL;
   hltdc.Init.DEPolarity = LTDC_DEPOLARITY_AL;
   hltdc.Init.PCPolarity = LTDC_PCPOLARITY_IPC;
-  hltdc.Init.HorizontalSync = 7;
-  hltdc.Init.VerticalSync = 3;
-  hltdc.Init.AccumulatedHBP = 14;
-  hltdc.Init.AccumulatedVBP = 5;
-  hltdc.Init.AccumulatedActiveW = 254;
-  hltdc.Init.AccumulatedActiveH = 325;
-  hltdc.Init.TotalWidth = 260;
+  hltdc.Init.HorizontalSync = 9;
+  hltdc.Init.VerticalSync = 1;
+  hltdc.Init.AccumulatedHBP = 29;
+  hltdc.Init.AccumulatedVBP = 3;
+  hltdc.Init.AccumulatedActiveW = 269;
+  hltdc.Init.AccumulatedActiveH = 323;
+  hltdc.Init.TotalWidth = 279;
   hltdc.Init.TotalHeigh = 327;
   hltdc.Init.Backcolor.Blue = 0;
   hltdc.Init.Backcolor.Green = 0;
@@ -376,40 +603,21 @@ static void MX_LTDC_Init(void)
     Error_Handler();
   }
   pLayerCfg.WindowX0 = 0;
-  pLayerCfg.WindowX1 = 0;
+  pLayerCfg.WindowX1 = 240;
   pLayerCfg.WindowY0 = 0;
-  pLayerCfg.WindowY1 = 0;
+  pLayerCfg.WindowY1 = 320;
   pLayerCfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
-  pLayerCfg.Alpha = 0;
+  pLayerCfg.Alpha = 255;
   pLayerCfg.Alpha0 = 0;
   pLayerCfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_CA;
   pLayerCfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_CA;
-  pLayerCfg.FBStartAdress = 0;
-  pLayerCfg.ImageWidth = 0;
-  pLayerCfg.ImageHeight = 0;
+  pLayerCfg.FBStartAdress = 0xD0000000;
+  pLayerCfg.ImageWidth = 240;
+  pLayerCfg.ImageHeight = 320;
   pLayerCfg.Backcolor.Blue = 0;
   pLayerCfg.Backcolor.Green = 0;
   pLayerCfg.Backcolor.Red = 0;
   if (HAL_LTDC_ConfigLayer(&hltdc, &pLayerCfg, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  pLayerCfg1.WindowX0 = 0;
-  pLayerCfg1.WindowX1 = 0;
-  pLayerCfg1.WindowY0 = 0;
-  pLayerCfg1.WindowY1 = 0;
-  pLayerCfg1.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
-  pLayerCfg1.Alpha = 0;
-  pLayerCfg1.Alpha0 = 0;
-  pLayerCfg1.BlendingFactor1 = LTDC_BLENDING_FACTOR1_CA;
-  pLayerCfg1.BlendingFactor2 = LTDC_BLENDING_FACTOR2_CA;
-  pLayerCfg1.FBStartAdress = 0;
-  pLayerCfg1.ImageWidth = 0;
-  pLayerCfg1.ImageHeight = 0;
-  pLayerCfg1.Backcolor.Blue = 0;
-  pLayerCfg1.Backcolor.Green = 0;
-  pLayerCfg1.Backcolor.Red = 0;
-  if (HAL_LTDC_ConfigLayer(&hltdc, &pLayerCfg1, 1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -699,7 +907,7 @@ static void MX_UART7_Init(void)
 
   /* USER CODE END UART7_Init 1 */
   huart7.Instance = UART7;
-  huart7.Init.BaudRate = 115200;
+  huart7.Init.BaudRate = 9600;
   huart7.Init.WordLength = UART_WORDLENGTH_8B;
   huart7.Init.StopBits = UART_STOPBITS_1;
   huart7.Init.Parity = UART_PARITY_NONE;
@@ -818,7 +1026,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : CMD_ON_OFF_Pin */
   GPIO_InitStruct.Pin = CMD_ON_OFF_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(CMD_ON_OFF_GPIO_Port, &GPIO_InitStruct);
 
@@ -859,13 +1067,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(CMD_WP_MEM_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB6 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 

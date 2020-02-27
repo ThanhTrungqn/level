@@ -72,6 +72,7 @@ void Error_Handler(void);
 #define CMD_LED6_GPIO_Port GPIOE
 #define CHRG_OK_Pin GPIO_PIN_13
 #define CHRG_OK_GPIO_Port GPIOC
+#define CHRG_OK_EXTI_IRQn EXTI15_10_IRQn
 #define PROCHOT_Pin GPIO_PIN_14
 #define PROCHOT_GPIO_Port GPIOC
 #define EN_OTG_Pin GPIO_PIN_15
@@ -86,12 +87,15 @@ void Error_Handler(void);
 #define TP_RESET_GPIO_Port GPIOD
 #define TP_INT_Pin GPIO_PIN_11
 #define TP_INT_GPIO_Port GPIOD
+#define TP_INT_EXTI_IRQn EXTI15_10_IRQn
 #define FLT_Pin GPIO_PIN_12
 #define FLT_GPIO_Port GPIOD
+#define FLT_EXTI_IRQn EXTI15_10_IRQn
 #define EN_DRIVER_Pin GPIO_PIN_13
 #define EN_DRIVER_GPIO_Port GPIOD
 #define CMD_ON_OFF_Pin GPIO_PIN_14
 #define CMD_ON_OFF_GPIO_Port GPIOD
+#define CMD_ON_OFF_EXTI_IRQn EXTI15_10_IRQn
 #define POWER_OK3_Pin GPIO_PIN_9
 #define POWER_OK3_GPIO_Port GPIOA
 #define POWER_OK2_Pin GPIO_PIN_10
