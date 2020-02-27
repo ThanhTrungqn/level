@@ -128,6 +128,7 @@ void Lexi_DO_Standard_PWM (TIM_HandleTypeDef htim){
 void Lexi_DO_PWM_LUM_DRIVER (TIM_HandleTypeDef htim){
 
 	uint8_t value = lexilight.lum_value; // Value from 0 to 100;
+	value = 100 - value;
 	__HAL_TIM_SET_COMPARE(&htim, TIM_CHANNEL_3, value);
 
 
@@ -216,7 +217,7 @@ unsigned int Lexi_Get_Freq(){
 	return lexilight.freq;
 }
 unsigned int Lexi_Get_Luminosity(){
-	return lexilight.lum_value;
+	return (lexilight.lum_value);
 }
 unsigned int Lexi_Get_Led_State(){
 	if (lexilight.state == LIGHT_STATE_LEXI){
@@ -226,6 +227,9 @@ unsigned int Lexi_Get_Led_State(){
 		return 1;
 	}
 	else if (lexilight.state == LIGHT_STATE_OFF) {
+		return 0;
+	}
+	else{
 		return 0;
 	}
 }

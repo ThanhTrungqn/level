@@ -245,15 +245,16 @@ void UART_Send_CMD(){
 
 		case UART_CMD_STATE:
 			sprintf(buffer,"-- State ");
+			uint8_t value_lum = Lexi_Get_Luminosity();
 			if ( Lexi_Get_Led_State() == 1){
 				sprintf(buffer + strlen(buffer),"- LED NORMAL ");
-				sprintf(buffer + strlen(buffer),"- Luminosity: %i ", Uart_data.Uart_cmd_lum);
+				sprintf(buffer + strlen(buffer),"- Luminosity: %i ", value_lum);
 			}
 			else if ( Lexi_Get_Led_State() == 2){
 				sprintf(buffer + strlen(buffer),"- LED LEXI MODE ");
 				sprintf(buffer + strlen(buffer),"- Duty : %i " , Uart_data.Uart_cmd_duty );
 				sprintf(buffer + strlen(buffer),"- Frequency : %i " , Uart_data.Uart_cmd_freq );
-				sprintf(buffer + strlen(buffer),"- Luminosity : %i ", Uart_data.Uart_cmd_lum );
+				sprintf(buffer + strlen(buffer),"- Luminosity : %i ", value_lum );
 			}
 			else if ( Lexi_Get_Led_State() == 0){
 				sprintf(buffer + strlen(buffer),"- LED OFF ");
