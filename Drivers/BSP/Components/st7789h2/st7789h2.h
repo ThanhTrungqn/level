@@ -79,7 +79,7 @@
   * @brief  ST7789H2 Size  
   */  
 #define  ST7789H2_LCD_PIXEL_WIDTH    ((uint16_t)240)
-#define  ST7789H2_LCD_PIXEL_HEIGHT   ((uint16_t)240)
+#define  ST7789H2_LCD_PIXEL_HEIGHT   ((uint16_t)320)
 
 /**
  *  @brief LCD_OrientationTypeDef
@@ -87,7 +87,7 @@
  */
 #define ST7789H2_ORIENTATION_PORTRAIT         ((uint32_t)0x00) /* Portrait orientation choice of LCD screen  */
 #define ST7789H2_ORIENTATION_LANDSCAPE        ((uint32_t)0x01) /* Landscape orientation choice of LCD screen */
-#define ST7789H2_ORIENTATION_LANDSCAPE_ROT180 ((uint32_t)0x02) /* Landscape rotated 180° orientation choice of LCD screen */
+#define ST7789H2_ORIENTATION_LANDSCAPE_ROT180 ((uint32_t)0x02) /* Landscape rotated 180ï¿½ orientation choice of LCD screen */
     
 /** 
   * @brief  ST7789H2 Registers  
@@ -160,7 +160,7 @@ extern void     LCD_IO_Init(void);
 extern void     LCD_IO_WriteMultipleData(uint16_t *pData, uint32_t Size);
 extern void     LCD_IO_WriteReg(uint8_t Reg);
 extern void     LCD_IO_WriteData(uint16_t RegValue);
-extern uint16_t LCD_IO_ReadData(void);
+extern uint16_t LCD_IO_ReadData(uint16_t RegValue);
 extern void     LCD_IO_Delay(uint32_t delay);
 
 /**

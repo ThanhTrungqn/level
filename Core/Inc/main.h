@@ -83,6 +83,8 @@ void Error_Handler(void);
 #define LCD_RESET_GPIO_Port GPIOA
 #define SHDN_CONTROL_Pin GPIO_PIN_4
 #define SHDN_CONTROL_GPIO_Port GPIOC
+#define WR_LCD_Pin GPIO_PIN_5
+#define WR_LCD_GPIO_Port GPIOC
 #define TP_RESET_Pin GPIO_PIN_9
 #define TP_RESET_GPIO_Port GPIOD
 #define TP_INT_Pin GPIO_PIN_11
@@ -100,8 +102,12 @@ void Error_Handler(void);
 #define POWER_OK3_GPIO_Port GPIOA
 #define POWER_OK2_Pin GPIO_PIN_10
 #define POWER_OK2_GPIO_Port GPIOA
+#define SCK_LCD_Pin GPIO_PIN_10
+#define SCK_LCD_GPIO_Port GPIOC
 #define ALIM_CLE_USB_Pin GPIO_PIN_11
 #define ALIM_CLE_USB_GPIO_Port GPIOC
+#define MOSI_LCD_Pin GPIO_PIN_12
+#define MOSI_LCD_GPIO_Port GPIOC
 #define CS_LCD_Pin GPIO_PIN_0
 #define CS_LCD_GPIO_Port GPIOD
 #define CMD_ALIM_LCD_Pin GPIO_PIN_1

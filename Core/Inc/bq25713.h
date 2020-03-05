@@ -20,6 +20,7 @@ typedef struct {
 	uint8_t Manufacture_Id;
 	uint8_t	Device_Id;
 	uint8_t adc_vbat;
+	uint8_t active_fast_charge;
 } BQ25713_DATA;
 
 

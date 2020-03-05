@@ -86,9 +86,11 @@ static void MX_UART7_Init(void);
 /* USER CODE BEGIN PFP */
 
 
-/* Chip Select macro definition */
-#define LCD_CS_LOW()       HAL_GPIO_WritePin(CS_LCD_GPIO_Port, CS_LCD_Pin, GPIO_PIN_RESET)
-#define LCD_CS_HIGH()      HAL_GPIO_WritePin(CS_LCD_GPIO_Port, CS_LCD_Pin, GPIO_PIN_SET)
+#define LCD_CS_LOW()       	HAL_GPIO_WritePin(CS_LCD_GPIO_Port, CS_LCD_Pin, GPIO_PIN_RESET)
+#define LCD_CS_HIGH()      	HAL_GPIO_WritePin(CS_LCD_GPIO_Port, CS_LCD_Pin, GPIO_PIN_SET)
+#define LCD_WR_LOW()		HAL_GPIO_WritePin(WR_LCD_GPIO_Port, WR_LCD_Pin, GPIO_PIN_RESET)
+#define LCD_WR_HIGH()		HAL_GPIO_WritePin(WR_LCD_GPIO_Port, WR_LCD_Pin, GPIO_PIN_SET)
+
 
 static void SPIx_Error(void)
 {
@@ -104,7 +106,7 @@ static void SPIx_Write(uint16_t Value)
 {
   HAL_StatusTypeDef status = HAL_OK;
 
-  status = HAL_SPI_Transmit(&hspi3, (uint8_t*) &Value, 2, 0x1000);
+  status = HAL_SPI_Transmit(&hspi3, (uint8_t*) &Value, 1, 0x1000);
 
   /* Check the communication status */
   if(status != HAL_OK)
@@ -112,6 +114,21 @@ static void SPIx_Write(uint16_t Value)
     /* Re-Initialize the BUS */
     SPIx_Error();
   }
+}
+
+static uint32_t SPIx_Read()
+{
+  HAL_StatusTypeDef status = HAL_OK;
+  uint32_t readvalue;
+
+  status = HAL_SPI_Receive(&hspi3, (uint8_t*) &readvalue, 4, 0x1000);
+
+  if(status != HAL_OK)
+  {
+    SPIx_Error();
+  }
+
+  return readvalue;
 }
 
 __weak void LCD_IO_Init(void)
@@ -123,24 +140,17 @@ __weak void LCD_IO_Init(void)
 }
 
 __weak void     LCD_IO_WriteReg(uint8_t Reg){
-	uint16_t data_send = 0x0000 + Reg;
-	data_send <<= 7;
-	/* Reset LCD control line(/CS) and Send command */
 	LCD_CS_LOW();
-	SPIx_Write(data_send);
-
-	/* Deselect: Chip Select high */
+	LCD_WR_LOW();
+	SPIx_Write(Reg);	// Start send 8 bit
 	LCD_CS_HIGH();
+
 }
 
 __weak void     LCD_IO_WriteData(uint16_t RegValue){
-	uint16_t data_send = 0x0100 + RegValue;
-	data_send <<= 7;
-	/* Reset LCD control line(/CS) and Send command */
 	LCD_CS_LOW();
-	SPIx_Write(data_send);
-
-	/* Deselect: Chip Select high */
+	LCD_WR_HIGH();
+	SPIx_Write(RegValue);	// Start send 8 bit
 	LCD_CS_HIGH();
 }
 
@@ -150,26 +160,27 @@ __weak void LCD_IO_Delay(uint32_t Delay)
 }
 
 
-/*
-__weak uint16_t LCD_IO_ReadData(void)
+__weak uint16_t LCD_IO_ReadData(uint16_t RegValue)
 {
-  uint32_t readvalue = 0;
+	  uint32_t readvalue = 0;
+	  /* Select: Chip Select low */
+	  LCD_CS_LOW();
 
-  LCD_CS_LOW();
+	  /* Reset WRX to send command */
+	  LCD_WR_LOW();
 
-  LCD_WRX_LOW();
+	  SPIx_Write(RegValue);
 
-  SPIx_Write(RegValue);
+	  readvalue = SPIx_Read();
 
-  readvalue = SPIx_Read(ReadSize);
+	  /* Set WRX to send data */
+	  LCD_WR_HIGH();
 
-  LCD_WRX_HIGH();
-
-  LCD_CS_HIGH();
+	  /* Deselect: Chip Select high */
+	  LCD_CS_HIGH();
 
   return readvalue;
 }
-*/
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -264,7 +275,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DAC_Init();
-  MX_LTDC_Init();
+  //MX_LTDC_Init();
   MX_CRC_Init();
   MX_SPI3_Init();
   MX_UART4_Init();
@@ -293,7 +304,9 @@ int main(void)
 	HAL_UART_Receive_IT(&huart7, Uart_data.Rx_data, 1);
 	UART_Init();
 	BQ25713_Init( hi2c1);
-	ST7789H2_Init();
+	HAL_GPIO_WritePin(CMD_ALIM_LCD_GPIO_Port , CMD_ALIM_LCD_Pin , GPIO_PIN_SET);
+	MX_LTDC_Init();
+	//ST7789H2_Init();
 
 
 	/*
@@ -329,7 +342,7 @@ int main(void)
 		  BQ25713_Task();
 		  count = 0;
 	  }
-	  //HAL_Delay(100);
+	  HAL_Delay(100);
 	  //HAL_I2C_Master_Transmit(&hi2c1, 0xD6, data, 3, 1000);
 	  //HAL_I2C_Master_Receive( &hi2c1, 0xD6, data, 3, 1000);
 	  //HAL_GPIO_WritePin(GPIOD, GPIO_PIN_1, GPIO_PIN_RESET);
@@ -580,7 +593,10 @@ static void MX_LTDC_Init(void)
   LTDC_LayerCfgTypeDef pLayerCfg = {0};
 
   /* USER CODE BEGIN LTDC_Init 1 */
+  ST7789H2_Init();
 
+ /* De-Initialize LTDC */
+  HAL_LTDC_DeInit(&hltdc);
   /* USER CODE END LTDC_Init 1 */
   hltdc.Instance = LTDC;
   hltdc.Init.HSPolarity = LTDC_HSPOLARITY_AL;
@@ -650,7 +666,7 @@ static void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -946,7 +962,7 @@ static void MX_GPIO_Init(void)
                           |CMD_LED6_Pin|CMD_LED1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, EN_OTG_Pin|SHDN_CONTROL_Pin|ALIM_CLE_USB_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, EN_OTG_Pin|SHDN_CONTROL_Pin|WR_LCD_Pin|ALIM_CLE_USB_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_RESET);
@@ -979,8 +995,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(PROCHOT_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : EN_OTG_Pin SHDN_CONTROL_Pin ALIM_CLE_USB_Pin */
-  GPIO_InitStruct.Pin = EN_OTG_Pin|SHDN_CONTROL_Pin|ALIM_CLE_USB_Pin;
+  /*Configure GPIO pins : EN_OTG_Pin SHDN_CONTROL_Pin WR_LCD_Pin ALIM_CLE_USB_Pin */
+  GPIO_InitStruct.Pin = EN_OTG_Pin|SHDN_CONTROL_Pin|WR_LCD_Pin|ALIM_CLE_USB_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -1011,8 +1027,10 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pins : TP_RESET_Pin EN_DRIVER_Pin CS_LCD_Pin CMD_ALIM_LCD_Pin 
                            CMD_ALIM_BLE_Pin CS_FLASH_Pin */
-  GPIO_InitStruct.Pin = TP_RESET_Pin|EN_DRIVER_Pin|CS_LCD_Pin|CMD_ALIM_LCD_Pin 
+  GPIO_InitStruct.Pin = TP_RESET_Pin|EN_DRIVER_Pin|CS_LCD_Pin|CMD_ALIM_LCD_Pin
                           |CMD_ALIM_BLE_Pin|CS_FLASH_Pin;
+  //GPIO_InitStruct.Pin = CS_LCD_Pin | CMD_ALIM_LCD_Pin |CMD_ALIM_BLE_Pin|CS_FLASH_Pin;
+
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
